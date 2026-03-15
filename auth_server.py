@@ -6,46 +6,18 @@ import jwt
 import os
 import datetime
 import logging
-import boto3
-import json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("authservice")
 
 app = Flask(__name__)
 
-# SECRET_KEY  = os.environ.get("JWT_SECRET_KEY", "itkannadigaru-ekart-secret-key")
-# DB_HOST     = "itkannadigaru.cfoqwaayg09s.us-west-2.rds.amazonaws.com"
-# DB_PORT     = 5432
-# DB_NAME     = "postgres"
-# DB_USER     = "postgres"
-# DB_PASSWORD = "Manoj7100"
-# DB_SSLCERT  = "/certs/global-bundle.pem"
-
-def get_secret():
-    secret_name = "authservice-db-secret"
-    region_name = "us-west-2"
-
-    client = boto3.client(
-        service_name="secretsmanager",
-        region_name=region_name
-    )
-
-    response = client.get_secret_value(
-        SecretId=secret_name
-    )
-
-    secret = json.loads(response['SecretString'])
-    return secret
-
-secrets = get_secret()
-
-SECRET_KEY  = secrets["JWT_SECRET_KEY"]
-DB_HOST     = secrets["DB_HOST"]
-DB_PORT     = secrets["DB_PORT"]
-DB_NAME     = secrets["DB_NAME"]
-DB_USER     = secrets["DB_USER"]
-DB_PASSWORD = secrets["DB_PASSWORD"]
+SECRET_KEY  = os.environ.get("JWT_SECRET_KEY", "itkannadigaru-ekart-secret-key")
+DB_HOST     = "quntam.crqai6ems4a2.ap-northeast-1.rds.amazonaws.com"
+DB_PORT     = 5432
+DB_NAME     = "postgres"
+DB_USER     = "postgres"
+DB_PASSWORD = "Manoj7100"
 DB_SSLCERT  = "/certs/global-bundle.pem"
 
 
