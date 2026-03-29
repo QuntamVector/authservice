@@ -6,37 +6,38 @@ import jwt
 import os
 import datetime
 import logging
+import boto3
+import json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("authservice")
 
 app = Flask(__name__)
 
-# SECRET_KEY  = os.environ.get("JWT_SECRET_KEY", "itkannadigaru-ekart-secret-key")
-# DB_HOST     = "postgres.crqai6ems4a2.ap-northeast-1.rds.amazonaws.com"
-# DB_PORT     = 5432
-# DB_NAME     = "postgres"
-# DB_USER     = "postgres"
-# DB_PASSWORD = "quantam123"
-DB_SSLCERT  = "/certs/global-bundle.pem"
+DB_SSLCERT = "/certs/global-bundle.pem"
 
-import boto3
-import json
+# Cache secret to avoid calling AWS every request
+_cached_secret = None
 
 def get_secret():
+    global _cached_secret
+
+    if _cached_secret:
+        return _cached_secret
+
     client = boto3.client("secretsmanager", region_name="ap-northeast-1")
-    
+
     response = client.get_secret_value(
         SecretId="authservice/db_credentials"
     )
-    
-    secret = json.loads(response["SecretString"])
-    return secret 
+
+    _cached_secret = json.loads(response["SecretString"])
+    return _cached_secret
 
 
 def get_db():
     secret = get_secret()
-    
+
     return psycopg2.connect(
         host=secret["host"],
         port=secret["port"],
@@ -46,6 +47,11 @@ def get_db():
         sslmode="verify-full",
         sslrootcert=DB_SSLCERT,
     )
+
+
+def get_jwt_secret():
+    secret = get_secret()
+    return secret["jwt_secret"]
 
 
 def init_db():
@@ -107,16 +113,19 @@ def register():
         logger.error("register db error: %s", e)
         return jsonify({"error": "internal server error"}), 500
 
+    SECRET_KEY = get_jwt_secret()
+
     token = jwt.encode(
         {
             "user_id":  user_id,
             "username": username,
             "email":    email,
-            "exp":      datetime.datetime.utcnow() + datetime.timedelta(hours=48),
+            "exp":      datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=48),
         },
         SECRET_KEY,
         algorithm="HS256",
     )
+
     logger.info("registered user: %s", username)
     return jsonify({"token": token, "user_id": user_id, "username": username}), 201
 
@@ -149,16 +158,19 @@ def login():
     if not user or not bcrypt.checkpw(password.encode(), user["password_hash"].encode()):
         return jsonify({"error": "invalid email or password"}), 401
 
+    SECRET_KEY = get_jwt_secret()
+
     token = jwt.encode(
         {
             "user_id":  user["id"],
             "username": user["username"],
             "email":    user["email"],
-            "exp":      datetime.datetime.utcnow() + datetime.timedelta(hours=48),
+            "exp":      datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=48),
         },
         SECRET_KEY,
         algorithm="HS256",
     )
+
     logger.info("login success: %s", user["username"])
     return jsonify({"token": token, "user_id": user["id"], "username": user["username"]}), 200
 
@@ -171,9 +183,15 @@ def verify():
     if not token:
         return jsonify({"valid": False, "error": "no token provided"}), 400
 
+    SECRET_KEY = get_jwt_secret()
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        return jsonify({"valid": True, "user_id": payload["user_id"], "username": payload["username"]}), 200
+        return jsonify({
+            "valid": True,
+            "user_id": payload["user_id"],
+            "username": payload["username"]
+        }), 200
     except jwt.ExpiredSignatureError:
         return jsonify({"valid": False, "error": "token expired"}), 401
     except jwt.InvalidTokenError:
