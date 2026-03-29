@@ -12,22 +12,37 @@ logger = logging.getLogger("authservice")
 
 app = Flask(__name__)
 
-SECRET_KEY  = os.environ.get("JWT_SECRET_KEY", "itkannadigaru-ekart-secret-key")
-DB_HOST     = "postgres.crqai6ems4a2.ap-northeast-1.rds.amazonaws.com"
-DB_PORT     = 5432
-DB_NAME     = "postgres"
-DB_USER     = "postgres"
-DB_PASSWORD = "quantam123"
-DB_SSLCERT  = "/certs/global-bundle.pem"
+# SECRET_KEY  = os.environ.get("JWT_SECRET_KEY", "itkannadigaru-ekart-secret-key")
+# DB_HOST     = "postgres.crqai6ems4a2.ap-northeast-1.rds.amazonaws.com"
+# DB_PORT     = 5432
+# DB_NAME     = "postgres"
+# DB_USER     = "postgres"
+# DB_PASSWORD = "quantam123"
+# DB_SSLCERT  = "/certs/global-bundle.pem"
+
+import boto3
+import json
+
+def get_secret():
+    client = boto3.client("secretsmanager", region_name="ap-northeast-1")
+    
+    response = client.get_secret_value(
+        SecretId="authservice/db_credentials"
+    )
+    
+    secret = json.loads(response["SecretString"])
+    return secret 
 
 
 def get_db():
+    secret = get_secret()
+    
     return psycopg2.connect(
-        host=DB_HOST,
-        port=DB_PORT,
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
+        host=secret["host"],
+        port=secret["port"],
+        dbname=secret["dbname"],
+        user=secret["username"],
+        password=secret["password"],
         sslmode="verify-full",
         sslrootcert=DB_SSLCERT,
     )
