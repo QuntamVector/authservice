@@ -18,7 +18,7 @@ app = Flask(__name__)
 # DB_NAME     = "postgres"
 # DB_USER     = "postgres"
 # DB_PASSWORD = "quantam123"
-# DB_SSLCERT  = "/certs/global-bundle.pem"
+DB_SSLCERT  = "/certs/global-bundle.pem"
 
 import boto3
 import json
